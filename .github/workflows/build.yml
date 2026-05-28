@@ -1,0 +1,55 @@
+name: Build Stocks.tipa
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Theos
+        run: |
+          export THEOS=/opt/theos
+          echo "THEOS=/opt/theos" >> $GITHUB_ENV
+          sudo rm -rf $THEOS
+          sudo git clone --depth=1 --recursive https://github.com/theos/theos.git $THEOS
+          sudo chown -R $(whoami):staff $THEOS
+
+      - name: Link iOS SDK
+        run: |
+          # 找到 Xcode 中的 iPhoneOS SDK
+          SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
+          SDK_VER=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "Found SDK: $SDK_PATH (version $SDK_VER)"
+
+          # Theos 需要 $THEOS/sdks/iPhoneOS${VER}.sdk
+          # 创建符号链接让 Theos 找到 SDK
+          mkdir -p /opt/theos/sdks
+          # 用实际版本号创建链接，同时创建 Makefile 中指定的 16.5 链接
+          ln -sf "$SDK_PATH" "/opt/theos/sdks/iPhoneOS${SDK_VER}.sdk"
+          # 如果实际 SDK 版本和目标版本不同，多创建一个目标版本命名的链接
+          if [ "$SDK_VER" != "16.5" ]; then
+            ln -sf "$SDK_PATH" "/opt/theos/sdks/iPhoneOS16.5.sdk"
+          fi
+          ls -la /opt/theos/sdks/
+
+      - name: Build
+        run: |
+          cd amazon/DeltaForce_TrollKit
+          export THEOS=/opt/theos
+          export FINAL_PACKAGE=1
+          make clean
+          make package
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Stocks.tipa
+          path: amazon/DeltaForce_TrollKit/packages/Stocks.tipa
+          if-no-files-found: error
