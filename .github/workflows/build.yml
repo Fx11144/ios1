@@ -40,6 +40,9 @@ jobs:
           fi
           ls -la /opt/theos/sdks/
 
+      - name: Install ldid
+        run: brew install ldid
+
       - name: Build
         run: |
           export THEOS=/opt/theos
